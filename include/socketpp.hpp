@@ -22,35 +22,26 @@
 #include <socketpp/exception.hpp>
 
 #include <string>
+#include <mutex>
+
 
 namespace socketpp {
 
   class Socket {
     public:
-      Socket(int const & socket);
-      Socket(Socket const&) = delete;
+      explicit Socket(SOCKET const & socket = INVALID_SOCKET);
+      Socket(Socket const& ) = delete;
       Socket& operator=(Socket const &) = delete;
       virtual ~Socket();
 
       void close();
-      bool write(std::string);
+      void write(std::string) throw (SocketException);
       std::string read();
 
+      bool closed() { return socket_ == INVALID_SOCKET; }
+
     protected:
-      int socket_;
-  };
-
-  class ServerSocket : public Socket {
-      ServerSocket(int const port = 8080, int const type = SOCK_STREAM) throw (SocketException);
-      ServerSocket(ServerSocket const &) = delete;
-      ServerSocket& operator=(ServerSocket const&) = delete;
-      ~ServerSocket();
-      
-      void start() throw (SocketException);
-      Socket wait_connection();
-
-    private:
-      struct addrinfo* host_info_;
+      SOCKET socket_;
+      std::mutex socket_mutex_;
   };
 }
-
