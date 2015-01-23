@@ -4,8 +4,7 @@ namespace socketpp {
 
   Socket::Socket(SOCKET const& socket) : socket_(socket)
   { 
-    if(socket_ == INVALID_SOCKET)
-      throw SocketException();
+
   }
 
   Socket::~Socket() {

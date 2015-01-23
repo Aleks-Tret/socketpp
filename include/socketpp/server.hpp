@@ -39,6 +39,7 @@ namespace socketpp {
       Connection wait_incoming_connection();
       void remove_closed_connections();
       void close_and_remove_oldest_connection();
+      void close_all_connections();
       std::list<Connection> clients_;
   };
 }

@@ -51,6 +51,14 @@ ADD_SUBDIRECTORY(${THIRDPARTY_DIR})
 
 FILE(MAKE_DIRECTORY ${PROJECT_SOURCE_DIR}/bin)
 
+if(${CMAKE_SYSTEM} MATCHES "Windows")
+  SET(Socket_LIBRARIES wsock32 ws2_32)
+elseif(${CMAKE_SYSTEM} MATCHES "INtime")
+  SET(Socket_LIBRARIES netlib)
+else()
+  SET(Socket_LIBRARIES)
+endif()
+
 ADD_SUBDIRECTORY(src)
 
 ##############################################################

@@ -3,12 +3,13 @@
 #include <sstream>
 
 #if defined(_WIN32) && !defined(__INTIME__)
-#define CHECK_STATUS(st) if ((st) == SOCKET_ERROR) goto error;
+#define CHECK_STATUS(st) if ((st) != 0) goto error;
 #else
 #define CHECK_STATUS(s) if ((s) < 0 ) goto error;
 #endif
 
 #define CHECK_SOCKET(so) if ((so) == INVALID_SOCKET) goto error;
+#include <algorithm>
 
 namespace socketpp
 {
@@ -62,8 +63,17 @@ namespace socketpp
     clients_.pop_front();
   }
 
+  void Server::close_all_connections()
+  {
+    std::for_each(clients_.begin(), clients_.end(), [](Connection conn) {
+      conn.socket->close();
+      conn.handler->join();
+    });
+  }
+
   void Server::start() throw (SocketException) {
     char yes = 1;
+    
     socket_ = socket(host_info_->ai_family, host_info_->ai_socktype, host_info_->ai_protocol);
     CHECK_SOCKET(socket_);
     CHECK_STATUS(setsockopt(socket_, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes)));
@@ -73,6 +83,9 @@ namespace socketpp
     server_thread_ = std::thread(&Server::handle_connections, this);
     return;
   error:
+#if defined(_WIN32) && !defined(__INTIME__)
+    int status = WSAGetLastError();
+#endif
     close();
     throw SocketException();
   }
@@ -80,6 +93,7 @@ namespace socketpp
   void Server::stop()
   {
     shutdown_ = true;
+    close();
   }
 
   void Server::handle_connections()
@@ -90,6 +104,7 @@ namespace socketpp
         close_and_remove_oldest_connection();
       clients_.push_back(wait_incoming_connection());
     }
+    close_all_connections();
   }
 
   void handle_connection(std::shared_ptr<Socket> socket, request_handler_t& handler)
