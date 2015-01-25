@@ -7,14 +7,17 @@
 #include <string>
 #include <list>
 #include <memory>
+#include <atomic>
 
 namespace socketpp {
   
   typedef std::function<std::string(std::string)> request_handler_t;
 
+  struct Connection;
+
   class Server : public Socket {
     public:
-      Server(int const port, int const type, request_handler_t handler, int const pool_size = 5) throw (SocketException);
+      Server(int const port, int const type, request_handler_t handler, size_t const pool_size = 5) throw (SocketException);
       Server(Server const &) = delete;
       Server operator=(Server const&) = delete;
       ~Server() override;
@@ -29,18 +32,11 @@ namespace socketpp {
       std::thread server_thread_;
       request_handler_t request_handler_;
 
-      bool shutdown_;
+      std::atomic<bool> shutdown_;
 
-      struct Connection {
-        std::shared_ptr<Socket> socket;
-        std::shared_ptr<std::thread> handler;
-      };
       void handle_connections();
+      
       Connection wait_incoming_connection();
-      void remove_closed_connections();
-      void close_and_remove_oldest_connection();
-      void close_all_connections();
-      std::list<Connection> clients_;
   };
 }
 

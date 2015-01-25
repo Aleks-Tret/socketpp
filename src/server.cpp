@@ -1,19 +1,21 @@
 #include <socketpp/server.hpp>
 
 #include <sstream>
+#include <algorithm>
+#include <iostream>
+#include <cstring>
 
 #if defined(_WIN32) && !defined(__INTIME__)
 #define CHECK_STATUS(st) if ((st) != 0) goto error;
 #else
 #define CHECK_STATUS(s) if ((s) < 0 ) goto error;
 #endif
-
 #define CHECK_SOCKET(so) if ((so) == INVALID_SOCKET) goto error;
-#include <algorithm>
+
+
 
 namespace socketpp
 {
-
   template<typename T>
   std::string to_string(const T& value) {
     std::ostringstream oss;
@@ -21,7 +23,7 @@ namespace socketpp
     return oss.str();
   }
 
-  Server::Server(int const port, int const type, request_handler_t handler, int const pool_size) throw (SocketException) :
+  Server::Server(int const port, int const type, request_handler_t handler, size_t const pool_size) throw (SocketException) :
     Socket(INVALID_SOCKET),
     host_info_(nullptr),
     pool_size_(pool_size),
@@ -47,75 +49,96 @@ namespace socketpp
     host_info_ = nullptr;
   }
 
-  void Server::remove_closed_connections()
+  struct Connection {
+    std::shared_ptr<Socket> socket;
+    std::shared_ptr<std::thread> handler;
+  };
+
+  void close_connection(Connection conn) {
+    conn.socket->close();
+    if (conn.handler->joinable())
+      conn.handler->join();
+  }
+
+  void remove_closed_connections(std::list<Connection>& clients)
   {
-    clients_.remove_if([](Connection connection) {
-      if (connection.socket->closed())
+    clients.remove_if([](Connection connection) {
+      if (connection.socket->closed() && connection.handler->joinable())
         connection.handler->join();
       return connection.socket->closed();
     });
   }
 
-  void Server::close_and_remove_oldest_connection()
+  void close_and_remove_oldest_connection(std::list<Connection>& clients)
   {
-    clients_.front().socket->close();
-    clients_.front().handler->join();
-    clients_.pop_front();
+    close_connection(clients.front());
+    clients.pop_front();
   }
 
-  void Server::close_all_connections()
-  {
-    std::for_each(clients_.begin(), clients_.end(), [](Connection conn) {
-      conn.socket->close();
-      conn.handler->join();
+  void close_all_connections(std::list<Connection>& clients) {
+    std::for_each(clients.begin(), clients.end(), [](Connection conn) {
+      close_connection(conn);
     });
+    clients.clear();
   }
 
   void Server::start() throw (SocketException) {
-    char yes = 1;
-    
+    int yes = 1;
     socket_ = socket(host_info_->ai_family, host_info_->ai_socktype, host_info_->ai_protocol);
     CHECK_SOCKET(socket_);
-    CHECK_STATUS(setsockopt(socket_, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes)));
+    CHECK_STATUS(setsockopt(socket_, SOL_SOCKET, SO_REUSEADDR, (char*)&yes, sizeof(yes)));
     CHECK_STATUS(bind(socket_, host_info_->ai_addr, host_info_->ai_addrlen));
-    CHECK_STATUS(listen(socket_, 1));
-    shutdown_ = false;
+    CHECK_STATUS(listen(socket_, pool_size_));
     server_thread_ = std::thread(&Server::handle_connections, this);
     return;
   error:
 #if defined(_WIN32) && !defined(__INTIME__)
     int status = WSAGetLastError();
+#else
+    int status = errno;
 #endif
+    std::cout << "Error while creating socket: " << status << std::endl;
     close();
     throw SocketException();
   }
 
-  void Server::stop()
-  {
-    shutdown_ = true;
+  void Server::stop() {
+    shutdown_.store(true);
     close();
+    if (server_thread_.joinable())
+      server_thread_.join();
   }
 
-  void Server::handle_connections()
-  {
-    while (!shutdown_) {
-      remove_closed_connections();
-      if (clients_.size() >= pool_size_)
-        close_and_remove_oldest_connection();
-      clients_.push_back(wait_incoming_connection());
+  void Server::handle_connections() {
+    std::list<Connection> clients;
+    shutdown_.store(false);
+    try {
+      while (!shutdown_.load()) {
+        remove_closed_connections(clients);
+        clients.push_back(wait_incoming_connection());
+        if (clients.size() > pool_size_)
+          close_and_remove_oldest_connection(clients);
+      }
     }
-    close_all_connections();
+    catch(...) {
+    }
+    close_all_connections(clients);
   }
 
-  void handle_connection(std::shared_ptr<Socket> socket, request_handler_t& handler)
-  {
+  void handle_connection(std::shared_ptr<Socket> socket, request_handler_t& handler) {
     std::string req;
-    while ((req = socket->read()).length() > 0)
-      socket->write(handler(req));
+    try {
+      while ((!socket->closed()) && ((req = socket->read()).length() > 0)) {
+        socket->write(handler(req));
+      }
+    }
+    catch(...) {
+    }
     socket->close();
+    return;
   }
 
-  Server::Connection Server::wait_incoming_connection() {
+  Connection Server::wait_incoming_connection() {
     struct sockaddr_storage client_addr;
     socklen_t addr_size = sizeof(client_addr);
     Connection client;

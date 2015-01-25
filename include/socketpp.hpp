@@ -14,8 +14,10 @@
   #include <unistd.h>
   static const int BOTH_DIRECTION=SHUT_RDWR;
   static int const INVALID_SOCKET = -1;
+  typedef int SOCKET;
+
   #ifndef __INTIME__
-    #define closesocket(s) close((s))
+    #define closesocket(s) ::close((s))
   #endif
 #endif
 
@@ -24,7 +26,9 @@
 #include <string>
 #include <mutex>
 
-#pragma warning(disable:4290)
+#ifdef _WIN32
+  #pragma warning(disable:4290)
+#endif
 
 namespace socketpp {
 
@@ -37,9 +41,10 @@ namespace socketpp {
 
       void close();
       void write(std::string) throw (SocketException);
-      std::string read();
+    void set_non_blocking(bool v);
+    std::string read();
 
-      bool closed() { return socket_ == INVALID_SOCKET; }
+      bool closed();
 
     protected:
       SOCKET socket_;
