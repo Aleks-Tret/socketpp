@@ -1,6 +1,6 @@
 #pragma once
 
-#include <socketpp.hpp>
+#include "socket.hpp"
 
 #include <functional>
 #include <thread>
@@ -35,7 +35,7 @@ namespace socketpp {
       std::atomic<bool> shutdown_;
 
       void handle_connections();
-      
+      // TODO: This method should be declared only in .cpp file
       Connection wait_incoming_connection();
   };
 }

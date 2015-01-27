@@ -38,7 +38,7 @@ std::list<std::pair<unsigned int, std::future<std::string>>> send_requests_and_c
   for (unsigned int v = 0; v < nb_messages; ++v) {
     ncs.push_back(std::make_pair(v, std::async(std::launch::async, [](std::string message, std::string address, unsigned int port) -> std::string {
 #ifdef _WIN32
-      std::string command = R"(python tests/nc.py )" + address + " " + std::to_string(port) + R"( --timeout 10 --message ")" + message + R"(")";
+      std::string command = R"(python ../nc.py )" + address + " " + std::to_string(port) + R"( --timeout 10 --message ")" + message + R"(")";
 #else
       std::string command = R"(echo ")" + message + R"(" | nc -G 10 )" + address + " " + std::to_string(port);
 #endif

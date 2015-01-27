@@ -5,14 +5,6 @@
 #include <iostream>
 #include <cstring>
 
-#if defined(_WIN32) && !defined(__INTIME__)
-#define CHECK_STATUS(st) if ((st) != 0) goto error;
-#else
-#define CHECK_STATUS(s) if ((s) < 0 ) goto error;
-#endif
-#define CHECK_SOCKET(so) if ((so) == INVALID_SOCKET) goto error;
-
-
 
 namespace socketpp
 {

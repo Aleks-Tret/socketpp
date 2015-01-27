@@ -12,8 +12,6 @@ notifications:
   email:
     on_success: change
     on_failure: always
-before_script:
-  - make prepare
 script: 
-  - make tests
+  - .tests/run-tests.sh
 
