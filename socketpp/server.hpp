@@ -17,17 +17,17 @@ namespace socketpp {
 
   class Server : public Socket {
     public:
-      Server(int const port, int const type, request_handler_t handler, size_t const pool_size = 5) throw (SocketException);
+      Server(int const port, int const type, request_handler_t handler, int const pool_size = 5) throw (SocketException);
       Server(Server const &) = delete;
       Server operator=(Server const&) = delete;
-      ~Server() override;
+      ~Server();
 
       void start() throw (SocketException);
       void stop();
 
     private:
       struct addrinfo* host_info_;
-      size_t pool_size_;
+      int pool_size_;
 
       std::thread server_thread_;
       request_handler_t request_handler_;

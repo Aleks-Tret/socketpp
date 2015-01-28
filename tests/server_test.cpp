@@ -33,7 +33,7 @@ std::function<std::string(unsigned int)> get_msg(std::string msg) {
   };
 }
 
-std::list<std::pair<unsigned int, std::future<std::string>>> send_requests_and_check_result(std::string msg, size_t nb_messages, std::string address, unsigned int port) {
+unsigned int send_requests_and_check_result(std::string msg, size_t nb_messages, std::string address, unsigned int port) {
   std::list<std::pair<unsigned int, std::future<std::string>>> ncs;
   for (unsigned int v = 0; v < nb_messages; ++v) {
     ncs.push_back(std::make_pair(v, std::async(std::launch::async, [](std::string message, std::string address, unsigned int port) -> std::string {
@@ -45,7 +45,9 @@ std::list<std::pair<unsigned int, std::future<std::string>>> send_requests_and_c
       return exec(command);
     }, get_msg(msg)(v), address, port)));
   }
-  return ncs;
+  return std::accumulate(ncs.begin(), ncs.end(), static_cast<unsigned int>(0), [](unsigned int res, std::pair<unsigned int, std::future<std::string>>& t) -> unsigned int {
+    return res + static_cast<unsigned int>((t.second.get() == get_msg("coucou")(t.first)) ? 1 : 0);
+  });
 }
 
 TEST_CASE("TCP Connections", "[server]") {
@@ -66,27 +68,18 @@ TEST_CASE("TCP Connections", "[server]") {
   server.start();
 
   SECTION("Handle one connection") {
-    auto ncs = send_requests_and_check_result("coucou", 1, address, port);
-    std::for_each(ncs.begin(), ncs.end(), [](std::pair<unsigned int, std::future<std::string>>& t) {
-      CHECK(get_msg("coucou")(t.first) == t.second.get());
-    });
+    REQUIRE(send_requests_and_check_result("coucou", 1, address, port) == 1);
   }
 
   SECTION("Handle multiple connections") {
-    auto ncs = send_requests_and_check_result("coucou", pool_size, address, port);
-    std::for_each(ncs.begin(), ncs.end(), [](std::pair<unsigned int, std::future<std::string>>& t) {
-      CHECK(get_msg("coucou")(t.first) == t.second.get());
-    });
+    REQUIRE(send_requests_and_check_result("coucou", pool_size, address, port) == pool_size);
   }
 
   SECTION("Handle too numerous connections") {
     size_t nb_messages = pool_size + 5;
-    auto ncs = send_requests_and_check_result("coucou", nb_messages, address, port);
-    auto nb_valid_result = std::accumulate(ncs.begin(), ncs.end(), 0, [](unsigned int res, std::pair<unsigned int, std::future<std::string>>& t) -> int {
-      return res + ((t.second.get() == get_msg("coucou")(t.first)) ? 1 : 0);
-    });
-    CHECK(nb_valid_result >= pool_size);
-    CHECK(nb_valid_result < nb_messages);
+    auto nb_valid_result = send_requests_and_check_result("coucou", nb_messages, address, port);
+    REQUIRE(nb_valid_result >= pool_size);
+    REQUIRE(nb_valid_result < nb_messages);
   }
   server.stop();
 

@@ -41,15 +41,16 @@ namespace socketpp {
       Socket& operator=(Socket const &) = delete;
       virtual ~Socket();
 
-      void close();
-      void write(std::string) throw (SocketException);
-      void set_non_blocking(bool v);
+      void write(std::string&&);
       std::string read();
+
+      void close();
       bool closed();
 
     protected:
-      SOCKET socket_;
-      std::mutex socket_mutex_;
+      // We do not protect access to Socket commands using mutex (only to socket value) because the only command that
+      // can be used from other thread is close, in order to stop thread used for communication
+      std::atomic<SOCKET> socket_;
   };
 }
 
