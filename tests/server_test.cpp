@@ -15,12 +15,6 @@
 # include <direct.h>
 #endif
 
-std::string get_current_working_directory() {
-  char cCurrentPath[FILENAME_MAX];
-  _getcwd(cCurrentPath, sizeof(cCurrentPath));
-  return std::string(cCurrentPath);
-}
-
 std::string get_exe_path() {
   char ownPth[MAX_PATH];
   HMODULE hModule = GetModuleHandle(nullptr);
@@ -73,7 +67,7 @@ TEST_CASE("TCP Connections", "[server]") {
 #endif
   static std::string const address = "localhost";
   static unsigned int const port = 8888;
-  static size_t const pool_size = 10;
+  static size_t const pool_size = 5;
 
   socketpp::Server server(8888, SOCK_STREAM, [](std::string req) {
       std::this_thread::sleep_for(std::chrono::milliseconds(500));

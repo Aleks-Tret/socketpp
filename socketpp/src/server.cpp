@@ -58,8 +58,7 @@ namespace socketpp
     std::list<connection_t> clients;
     SOCKET client_sock;
     try {
-      // *accept* returning INVALID_SOCKET means socket has been closed
-      while ((client_sock = socket_.accept()) != INVALID_SOCKET) {
+      while (client_sock = socket_.accept()) {
         clients.push_back(std::make_unique<Connection>(client_sock, request_handler_));
         // Remove closed function
         clients.remove_if([](connection_t& connection) {
