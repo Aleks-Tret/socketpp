@@ -1,7 +1,6 @@
 #include <socketpp/socket.hpp>
 
 #include <cstring>
-#include <string>
 #include <iostream>
 
 namespace socketpp {
@@ -19,10 +18,6 @@ namespace socketpp {
   Socket::Socket(SOCKET const& socket) : socket_(socket)
   { }
 
-  Socket::~Socket() {
-    close();
-  }
-
   Socket::Socket(int const port, int const type) {
     struct addrinfo hint;
     struct addrinfo* host_info;
@@ -31,16 +26,18 @@ namespace socketpp {
     hint.ai_family = AF_INET;
     hint.ai_socktype = type;
     hint.ai_flags = AI_PASSIVE;
+    std::lock_guard<std::mutex> lock(socket_mutex_);
     CHECK_STATUS(getaddrinfo(NULL, std::to_string(port).c_str(), &hint, &host_info));
     int yes = 1;
-    socket_.store(socket(host_info->ai_family, host_info->ai_socktype, host_info->ai_protocol));
-    CHECK_SOCKET(socket_.load());
-    CHECK_STATUS(setsockopt(socket_.load(), SOL_SOCKET, SO_REUSEADDR, (char*)&yes, sizeof(yes)));
-    CHECK_STATUS(bind(socket_.load(), host_info->ai_addr, host_info->ai_addrlen));
+    SOCKET s = socket(host_info->ai_family, host_info->ai_socktype, host_info->ai_protocol);
+    CHECK_SOCKET(s);
+    CHECK_STATUS(setsockopt(s, SOL_SOCKET, SO_REUSEADDR, (char*)&yes, sizeof(yes)));
+    CHECK_STATUS(bind(s, host_info->ai_addr, host_info->ai_addrlen));
+    CHECK_STATUS(listen(s, 1));
+    socket_ = unique_SOCKET(s);
     goto cleanup;
   error:
     status = report_socket_error();
-    close();
   cleanup:
     if (host_info != nullptr)
       freeaddrinfo(host_info);
@@ -48,27 +45,28 @@ namespace socketpp {
     if (status != 0) throw SocketException();
   }
 
-  void Socket::close() {
-    shutdown(socket_.load(), BOTH_DIRECTION);
-    closesocket(socket_.load());
-    socket_.store(INVALID_SOCKET);
-  }
-
   void Socket::write(std::string&& msg) {
-    if (send(socket_.load(), msg.c_str(), msg.length(), 0) != msg.length())
-      close();
+    std::lock_guard<std::mutex> lock(socket_mutex_);
+    if (send(socket_.get(), msg.c_str(), msg.length(), 0) != msg.length())
+      throw SocketException();
   }
 
   std::string Socket::read() {
     const auto MAX_SIZE = 4096;
     char client_message[MAX_SIZE];
     memset(client_message, 0, MAX_SIZE);
-    auto complete_read_size = recv(socket_.load(), &client_message[0], MAX_SIZE, 0);
+    std::lock_guard<std::mutex> lock(socket_mutex_);
+    auto complete_read_size = recv(socket_.get(), &client_message[0], MAX_SIZE, 0);
     if (complete_read_size <= 0) {
-      close();
       return "";
     }
     return std::string(client_message, static_cast<size_t>(complete_read_size));
+  }
+
+  SOCKET Socket::accept() {
+    struct sockaddr_storage client_addr;
+    socklen_t addr_size = sizeof(client_addr);
+    return ::accept(socket_.get(), reinterpret_cast<struct sockaddr*>(&client_addr), &addr_size);
   }
 }
 

@@ -1,11 +1,14 @@
 #pragma once
 
-#if defined(_WIN32) && !defined(__INTIME__)
-# include <WinSock2.h>
-# include <ws2tcpip.h>
-# include <io.h>
-  static const int BOTH_DIRECTION=SD_BOTH;
-# define CHECK_STATUS(st) if ((st) != 0) goto error;
+#if defined(_WIN32)
+# if !defined(__INTIME__)
+#  include <WinSock2.h>
+#  include <ws2tcpip.h>
+#  include <io.h>
+   static const int BOTH_DIRECTION=SD_BOTH;
+#  define CHECK_STATUS(st) if ((st) != 0) goto error;
+# endif
+#  pragma warning(disable:4290)
 #else
 # include <sys/types.h>
 # include <sys/socket.h>
@@ -24,13 +27,24 @@
 #define CHECK_SOCKET(so) if ((so) == INVALID_SOCKET) goto error;
 
 #include <socketpp/exception.hpp>
+#include <socketpp/unique_handler.hpp>
 
 #include <string>
-#include <atomic>
+#include <mutex>
+#include <memory>
 
-#ifdef _WIN32
-# pragma warning(disable:4290)
-#endif
+
+struct SocketDeleter
+{
+  typedef UniqueHandle<SOCKET, INVALID_SOCKET> pointer;
+  void operator()(pointer p) {
+    ::closesocket(p);
+    shutdown(p, BOTH_DIRECTION);
+    p = INVALID_SOCKET;
+  }
+};
+
+typedef std::unique_ptr<SOCKET, SocketDeleter> unique_SOCKET;
 
 namespace socketpp {
 
@@ -40,21 +54,16 @@ namespace socketpp {
       Socket(int const port, int const type);
       Socket(Socket const& ) = delete;
       Socket& operator=(Socket const &) = delete;
-      virtual ~Socket();
+      virtual ~Socket() = default;
 
       void write(std::string&&);
       std::string read();
 
-      
+      SOCKET accept();
 
     protected:
-      // We do not protect access to Socket commands using mutex (only to socket value) because the only command that
-      // can be used from other thread is close, in order to stop thread used for communication
-      std::atomic<SOCKET> socket_;
-
-      void close();
+      std::mutex socket_mutex_;
+      unique_SOCKET socket_;
   };
-
-  int report_socket_error();
 }
 

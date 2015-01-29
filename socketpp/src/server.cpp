@@ -1,10 +1,9 @@
 #include <socketpp/server.hpp>
 
-#include <sstream>
 #include <algorithm>
-#include <iostream>
 #include <cstring>
-
+#include <atomic>
+#include <list>
 
 namespace socketpp
 {
@@ -44,45 +43,28 @@ namespace socketpp
   { }
 
   Server::Server(int const port, int const type, request_handler_t handler, size_t const pool_size) throw (SocketException) :
-    Socket(port, type),
     pool_size_(pool_size),
-    request_handler_(handler),
-    shutdown_(true),
-    server_thread_(nullptr, &del_thread)
-  {
-  }
-
-  Server::~Server() {
-    shutdown_.store(true);
-  }
+    socket_(port, type),
+    server_thread_(nullptr, &del_thread),
+    request_handler_(handler)
+  { }
 
   void Server::start() {
-    CHECK_STATUS(listen(socket_.load(), 1));
     server_thread_ = thread_uptr_t(new std::thread(&Server::handle_connections, this), &del_thread);
-    return;
-  error:
-    report_socket_error();
-    close();
-    throw SocketException();
-  }
-
-  SOCKET Server::accept() {
-    struct sockaddr_storage client_addr;
-    socklen_t addr_size = sizeof(client_addr);
-    return ::accept(socket_.load(), reinterpret_cast<struct sockaddr*>(&client_addr), &addr_size);
   }
 
   void Server::handle_connections() {
     using  connection_t = std::unique_ptr<Connection>;
     std::list<connection_t> clients;
-    shutdown_.store(false);
+    SOCKET client_sock;
     try {
-      while (!shutdown_.load()) {
+      // *accept* returning INVALID_SOCKET means socket has been closed
+      while ((client_sock = socket_.accept()) != INVALID_SOCKET) {
+        clients.push_back(std::make_unique<Connection>(client_sock, request_handler_));
         // Remove closed function
         clients.remove_if([](connection_t& connection) {
           return connection->finished();
         });
-        clients.push_back(std::make_unique<Connection>(accept(), request_handler_));
         if (clients.size() > pool_size_)
           // Remove oldest connection
           clients.pop_front();
@@ -90,6 +72,5 @@ namespace socketpp
     }
     catch (...) {
     }
-    clients.clear();
   }
 }
