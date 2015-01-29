@@ -19,6 +19,10 @@ namespace socketpp {
   Socket::Socket(SOCKET const& socket) : socket_(socket)
   { }
 
+  Socket::~Socket() {
+    close();
+  }
+
   Socket::Socket(int const port, int const type) {
     struct addrinfo hint;
     struct addrinfo* host_info;
@@ -44,10 +48,6 @@ namespace socketpp {
     if (status != 0) throw SocketException();
   }
 
-  Socket::~Socket() {
-    close();
-  }
-
   void Socket::close() {
     shutdown(socket_.load(), BOTH_DIRECTION);
     closesocket(socket_.load());
@@ -57,10 +57,6 @@ namespace socketpp {
   void Socket::write(std::string&& msg) {
     if (send(socket_.load(), msg.c_str(), msg.length(), 0) != msg.length())
       close();
-  }
-
-  bool Socket::closed() {
-    return socket_.load() == INVALID_SOCKET;
   }
 
   std::string Socket::read() {

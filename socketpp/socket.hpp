@@ -45,13 +45,14 @@ namespace socketpp {
       void write(std::string&&);
       std::string read();
 
-      void close();
-      bool closed();
+      
 
     protected:
       // We do not protect access to Socket commands using mutex (only to socket value) because the only command that
       // can be used from other thread is close, in order to stop thread used for communication
       std::atomic<SOCKET> socket_;
+
+      void close();
   };
 
   int report_socket_error();

@@ -93,7 +93,7 @@ TEST_CASE("TCP Connections", "[server]") {
     size_t nb_messages = pool_size + 5;
     auto nb_valid_result = send_requests_and_check_result("coucou", nb_messages, address, port);
     REQUIRE(nb_valid_result >= pool_size);
-    REQUIRE(nb_valid_result < nb_messages);
+    REQUIRE(nb_valid_result <= nb_messages);
   }
 #if defined(_WIN32) && !defined(__INTIME__)
   WSACleanup();
