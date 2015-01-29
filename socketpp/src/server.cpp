@@ -8,6 +8,61 @@
 
 namespace socketpp
 {
+  void handle_connection(Socket& socket, request_handler_t& handler) {
+    std::string req;
+    try {
+      while ((req = socket.read()).length() > 0) {
+        socket.write(handler(req));
+      }
+    }
+    catch (...) {
+    }
+    socket.close();
+    return;
+  }
+
+  class Connection {
+  public:
+    Socket socket;
+    std::thread connection_thread;
+
+    Connection(SOCKET, request_handler_t);
+    ~Connection();
+    Connection(Connection const&) = delete;
+    Connection& operator=(Connection const&) = delete;
+  };
+
+  Connection::Connection(SOCKET s, request_handler_t h)
+    : socket(s),
+      connection_thread(std::thread(&handle_connection, std::ref(socket), h))
+  {
+  }
+
+  Connection::~Connection()
+  {
+    socket.close();
+    connection_thread.join();
+  }
+
+  typedef std::unique_ptr<Connection> connection_t;
+  typedef std::list<connection_t> connections_t;
+
+  void remove_closed_connections(connections_t & clients)
+  {
+    clients.remove_if([](connection_t& connection) {
+      return connection->socket.closed();
+    });
+  }
+
+  void close_and_remove_oldest_connection(connections_t& clients)
+  {
+    clients.pop_front();
+  }
+
+  void close_all_connections(connections_t& clients) {
+    clients.clear();
+  }
+
   Server::Server(int const port, int const type, request_handler_t handler, int const pool_size) throw (SocketException) :
     Socket(port, type),
     pool_size_(pool_size),
@@ -18,39 +73,6 @@ namespace socketpp
 
   Server::~Server() {
     stop();
-  }
-
-  struct Connection {
-    std::shared_ptr<Socket> socket;
-    std::shared_ptr<std::thread> handler;
-  };
-
-  void close_connection(Connection conn) {
-    conn.socket->close();
-    if (conn.handler->joinable())
-      conn.handler->join();
-  }
-
-  void remove_closed_connections(std::list<Connection>& clients)
-  {
-    clients.remove_if([](Connection connection) {
-      if (connection.socket->closed() && connection.handler->joinable())
-        connection.handler->join();
-      return connection.socket->closed();
-    });
-  }
-
-  void close_and_remove_oldest_connection(std::list<Connection>& clients)
-  {
-    close_connection(clients.front());
-    clients.pop_front();
-  }
-
-  void close_all_connections(std::list<Connection>& clients) {
-    std::for_each(clients.begin(), clients.end(), [](Connection conn) {
-      close_connection(conn);
-    });
-    clients.clear();
   }
 
   void Server::start() {
@@ -70,13 +92,19 @@ namespace socketpp
       server_thread_.join();
   }
 
+  SOCKET Server::accept() {
+    struct sockaddr_storage client_addr;
+    socklen_t addr_size = sizeof(client_addr);
+    return ::accept(socket_.load(), reinterpret_cast<struct sockaddr*>(&client_addr), &addr_size);
+  }
+
   void Server::handle_connections() {
-    std::list<Connection> clients;
+    connections_t clients;
     shutdown_.store(false);
     try {
       while (!shutdown_.load()) {
         remove_closed_connections(clients);
-        clients.push_back(wait_incoming_connection());
+        clients.push_back(std::make_unique<Connection>(accept(), request_handler_));
         if (clients.size() > pool_size_)
           close_and_remove_oldest_connection(clients);
       }
@@ -84,27 +112,5 @@ namespace socketpp
     catch (...) {
     }
     close_all_connections(clients);
-  }
-
-  void handle_connection(std::shared_ptr<Socket> socket, request_handler_t& handler) {
-    std::string req;
-    try {
-      while ((!socket->closed()) && ((req = socket->read()).length() > 0)) {
-        socket->write(handler(req));
-      }
-    }
-    catch(...) {
-    }
-    socket->close();
-    return;
-  }
-
-  Connection Server::wait_incoming_connection() {
-    struct sockaddr_storage client_addr;
-    socklen_t addr_size = sizeof(client_addr);
-    Connection client;
-    client.socket = std::make_shared<Socket>(accept(socket_.load(), reinterpret_cast<struct sockaddr*>(&client_addr), &addr_size));
-    client.handler = std::make_shared<std::thread>(&handle_connection, client.socket, std::ref(request_handler_));
-    return client;
   }
 }
