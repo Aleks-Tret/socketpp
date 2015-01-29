@@ -60,7 +60,7 @@ file(GLOB Sources
 #-----------------------------------------------------------------------
 if (UNIX)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
-  if (APPLE)
+  if (APPLE AND (NOT CMAKE_COMPILER_IS_GNUCXX))
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++")
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -stdlib=libc++")
   endif ()

@@ -7,46 +7,45 @@
 
 namespace socketpp
 {
-  void handle_connection(Socket& socket, request_handler_t& handler, std::atomic<bool>& finished) {
-    std::string req;
-    try {
-      while ((req = socket.read()).length() > 0) {
-        socket.write(handler(req));
-      }
-    }
-    catch (...) {
-    }
-    finished.store(true);
-  }
-
   class Connection {
   public:
-    Connection(SOCKET, request_handler_t);
+    Connection(SOCKET&, request_handler_t&);
     ~Connection() = default;
     Connection(Connection const&) = delete;
     Connection& operator=(Connection const&) = delete;
 
-    bool finished() {
-      return finished_.load();
-    }
+    bool finished() { return socket_ ? true : false; }
 
   private:
-    Socket socket_;
-    std::atomic<bool> finished_;
+    std::unique_ptr<Socket> socket_;
+    request_handler_t request_handler_;
     thread_uptr_t connection_thread_;
+
+    void handle_connection();
   };
 
-  Connection::Connection(SOCKET s, request_handler_t h)
-    : socket_(s),
-      finished_(false),
-      connection_thread_(new std::thread(&handle_connection, std::ref(socket_), h, std::ref(finished_)), &del_thread)
+  Connection::Connection(SOCKET& s, request_handler_t& h)
+    : socket_(new Socket(s)),
+      request_handler_(h),
+      connection_thread_(new std::thread(&Connection::handle_connection, this), &del_thread)
   { }
 
-  Server::Server(int const port, int const type, request_handler_t handler, size_t const pool_size) throw (SocketException) :
-    pool_size_(pool_size),
-    socket_(port, type),
-    server_thread_(nullptr, &del_thread),
-    request_handler_(handler)
+  void Connection::handle_connection() {
+    std::string req;
+    try {
+      while ((req = socket_->read()).length() > 0)
+        socket_->write(request_handler_(req));
+    }
+    catch (...) {
+    }
+    socket_.reset();
+  }
+
+  Server::Server(int const port, int const type, request_handler_t handler, size_t const pool_size) throw (SocketException)
+      : pool_size_(pool_size),
+        socket_(new Socket(port, type)),
+        server_thread_(nullptr, &del_thread),
+        request_handler_(handler)
   { }
 
   void Server::start() {
@@ -58,8 +57,8 @@ namespace socketpp
     std::list<connection_t> clients;
     SOCKET client_sock;
     try {
-      while (client_sock = socket_.accept()) {
-        clients.push_back(std::make_unique<Connection>(client_sock, request_handler_));
+      while ((client_sock = socket_->accept()) != INVALID_SOCKET) {
+        clients.push_back(std::unique_ptr<Connection>(new Connection(client_sock, request_handler_)));
         // Remove closed function
         clients.remove_if([](connection_t& connection) {
           return connection->finished();
@@ -71,5 +70,7 @@ namespace socketpp
     }
     catch (...) {
     }
+    socket_.reset();
+    clients.clear();
   }
 }

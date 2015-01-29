@@ -20,9 +20,7 @@
   static int const INVALID_SOCKET = -1;
   typedef int SOCKET;
 # define CHECK_STATUS(s) if ((s) < 0 ) goto error;
-# ifndef __INTIME__
-#   define closesocket(s) ::close((s))
-# endif
+# define closesocket(s) close((s))
 #endif
 #define CHECK_SOCKET(so) if ((so) == INVALID_SOCKET) goto error;
 
@@ -38,7 +36,7 @@ struct SocketDeleter
 {
   typedef UniqueHandle<SOCKET, INVALID_SOCKET> pointer;
   void operator()(pointer p) {
-    ::closesocket(p);
+    closesocket(p);
     shutdown(p, BOTH_DIRECTION);
     p = INVALID_SOCKET;
   }

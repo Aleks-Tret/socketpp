@@ -1,10 +1,10 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 import click
 import socket
-from time import sleep
-import select
+import sys
+import time
 
 @click.command()
 @click.argument('address', type=click.STRING, required=True)
@@ -23,8 +23,8 @@ def client(address, port, udp, message, timeout):
       s.sendall(message.encode('utf-8'))
       resp = s.recv(1024)
       print(resp.decode())
-  except (ConnectionRefusedError, BlockingIOError) as e:
-    print("Error {0}: {1}".format(e.errno, e.strerror))
+  except (BrokenPipeError, socket.error) as e:
+    print(str(e), file=sys.stderr)
   finally:
     s.close()
 
