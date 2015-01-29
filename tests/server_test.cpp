@@ -10,9 +10,23 @@
 #include <numeric>
 
 #ifdef _WIN32
-#define popen _popen
-#define pclose _pclose
+# define popen _popen
+# define pclose _pclose
+# include <direct.h>
 #endif
+
+std::string get_current_working_directory() {
+  char cCurrentPath[FILENAME_MAX];
+  _getcwd(cCurrentPath, sizeof(cCurrentPath));
+  return std::string(cCurrentPath);
+}
+
+std::string get_exe_path() {
+  char ownPth[MAX_PATH];
+  HMODULE hModule = GetModuleHandle(nullptr);
+  GetModuleFileName(hModule, ownPth, (sizeof(ownPth)));
+  return std::string(ownPth);
+}
 
 std::string exec(std::string cmd) {
   FILE* pipe = popen(cmd.c_str(), "r");
@@ -37,8 +51,8 @@ unsigned int send_requests_and_check_result(std::string msg, size_t nb_messages,
   std::list<std::pair<unsigned int, std::future<std::string>>> ncs;
   for (unsigned int v = 0; v < nb_messages; ++v) {
     ncs.push_back(std::make_pair(v, std::async(std::launch::async, [](std::string message, std::string address, unsigned int port) -> std::string {
-#ifdef _WIN32
-      std::string command = R"(python ../nc.py )" + address + " " + std::to_string(port) + R"( --timeout 10 --message ")" + message + R"(")";
+#ifdef _WIN32      
+      std::string command = "python " + get_exe_path() + R"(\..\..\nc.py )" + address + " " + std::to_string(port) + R"( --timeout 10 --message ")" + message + R"(")";
 #else
       std::string command = R"(echo ")" + message + R"(" | nc -G 10 )" + address + " " + std::to_string(port);
 #endif
@@ -81,8 +95,6 @@ TEST_CASE("TCP Connections", "[server]") {
     REQUIRE(nb_valid_result >= pool_size);
     REQUIRE(nb_valid_result < nb_messages);
   }
-  server.stop();
-
 #if defined(_WIN32) && !defined(__INTIME__)
   WSACleanup();
 #endif

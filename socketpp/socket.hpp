@@ -26,7 +26,7 @@
 #include <socketpp/exception.hpp>
 
 #include <string>
-#include <mutex>
+#include <atomic>
 
 #ifdef _WIN32
 # pragma warning(disable:4290)
@@ -37,6 +37,7 @@ namespace socketpp {
   class Socket {
     public:
       explicit Socket(SOCKET const & socket = INVALID_SOCKET);
+      Socket(int const port, int const type);
       Socket(Socket const& ) = delete;
       Socket& operator=(Socket const &) = delete;
       virtual ~Socket();
@@ -52,5 +53,7 @@ namespace socketpp {
       // can be used from other thread is close, in order to stop thread used for communication
       std::atomic<SOCKET> socket_;
   };
+
+  int report_socket_error();
 }
 

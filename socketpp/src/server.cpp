@@ -8,37 +8,16 @@
 
 namespace socketpp
 {
-  template<typename T>
-  std::string to_string(const T& value) {
-    std::ostringstream oss;
-    oss << value;
-    return oss.str();
-  }
-
   Server::Server(int const port, int const type, request_handler_t handler, int const pool_size) throw (SocketException) :
-    Socket(INVALID_SOCKET),
-    host_info_(nullptr),
+    Socket(port, type),
     pool_size_(pool_size),
     request_handler_(handler),
     shutdown_(true)
   {
-    struct addrinfo hint;
-    memset(reinterpret_cast<char*>(&hint), 0, sizeof(hint));
-    hint.ai_family = AF_INET;
-    hint.ai_socktype = type;
-    hint.ai_flags = AI_PASSIVE;
-    CHECK_STATUS(getaddrinfo(NULL, to_string(port).c_str(), &hint, &host_info_));
-    return;
-  error:
-    close();
-    throw SocketException();
-
   }
 
   Server::~Server() {
-    if (host_info_ != nullptr)
-      freeaddrinfo(host_info_);
-    host_info_ = nullptr;
+    stop();
   }
 
   struct Connection {
@@ -74,22 +53,12 @@ namespace socketpp
     clients.clear();
   }
 
-  void Server::start() throw (SocketException) {
-    int yes = 1;
-    socket_.store(socket(host_info_->ai_family, host_info_->ai_socktype, host_info_->ai_protocol));
-    CHECK_SOCKET(socket_.load());
-    CHECK_STATUS(setsockopt(socket_.load(), SOL_SOCKET, SO_REUSEADDR, (char*)&yes, sizeof(yes)));
-    CHECK_STATUS(bind(socket_.load(), host_info_->ai_addr, host_info_->ai_addrlen));
+  void Server::start() {
     CHECK_STATUS(listen(socket_.load(), pool_size_));
     server_thread_ = std::thread(&Server::handle_connections, this);
     return;
   error:
-#if defined(_WIN32) && !defined(__INTIME__)
-    int status = WSAGetLastError();
-#else
-    int status = errno;
-#endif
-    std::cout << "Error while creating socket: " << status << std::endl;
+    report_socket_error();
     close();
     throw SocketException();
   }
@@ -97,7 +66,8 @@ namespace socketpp
   void Server::stop() {
     shutdown_.store(true);
     close(); // To cancel *accept* command
-    server_thread_.join();
+    if (server_thread_.joinable())
+      server_thread_.join();
   }
 
   void Server::handle_connections() {

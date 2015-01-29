@@ -22,11 +22,9 @@ namespace socketpp {
       Server operator=(Server const&) = delete;
       ~Server();
 
-      void start() throw (SocketException);
-      void stop();
+      void start();
 
     private:
-      struct addrinfo* host_info_;
       int pool_size_;
 
       std::thread server_thread_;
@@ -37,6 +35,8 @@ namespace socketpp {
       void handle_connections();
       // TODO: This method should be declared only in .cpp file
       Connection wait_incoming_connection();
+
+      void stop();
   };
 }
 
