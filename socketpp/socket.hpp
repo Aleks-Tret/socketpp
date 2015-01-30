@@ -36,7 +36,7 @@ namespace socketpp {
 
   void del_SOCKET(SOCKET s);
 
-  typedef std::unique_ptr<SOCKET, stateless_deleter<SOCKET, void(*)(SOCKET), &del_SOCKET>> unique_SOCKET;
+  using unique_SOCKET = std::unique_ptr<SOCKET, OneLinerDeleter<SOCKET, INVALID_SOCKET, void, del_SOCKET> >;
 
   class Socket {
     public:

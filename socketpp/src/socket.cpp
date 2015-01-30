@@ -49,8 +49,7 @@ namespace socketpp {
   }
 
   Socket::Socket(SOCKET const& socket) 
-    : socket_(socket),
-      socket_mutex_()
+    : socket_(socket)
   {
 #ifdef DEBUG_MEMORY_ALLOC
     g_nb_opened_sockets++;
@@ -58,8 +57,7 @@ namespace socketpp {
   }
 
   Socket::Socket(int const port, int const type) 
-    : socket_(CreateSocket(port, type)),
-      socket_mutex_()
+    : socket_(CreateSocket(port, type))
   {
 #ifdef DEBUG_MEMORY_ALLOC
     g_nb_opened_sockets++;

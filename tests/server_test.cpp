@@ -60,7 +60,7 @@ unsigned int send_requests_and_check_result(std::string msg, size_t nb_messages,
 #ifdef _WIN32      
       std::string command = "python " + get_exe_path() + R"(\..\..\nc.py )" + address + " " + std::to_string(port) + R"( --timeout 1 --message ")" + message + R"(")";
 #else
-      std::string command = R"(echo ")" + message + R"(" | nc -G 1 )" + address + " " + std::to_string(port);
+      std::string command = R"(echo ")" + message + R"(" | nc )" + address + " " + std::to_string(port);
      // std::string command = R"(python3 ~/Desktop/socketpp/tests/nc.py )" + address + " " + std::to_string(port) + R"( --timeout 1 --message ")" + message + R"(")";
 #endif
       return exec(command);
