@@ -1,9 +1,21 @@
 #include <socketpp/socket.hpp>
+#include <socketpp/exception.hpp>
 
 #include <cstring>
-#include <iostream>
+
+#ifdef DEBUG_MEMORY_ALLOC
+long g_nb_opened_sockets = 0;
+#endif
 
 namespace socketpp {
+  
+  inline void del_SOCKET(SOCKET s) {
+#ifdef DEBUG_MEMORY_ALLOC
+    g_nb_opened_sockets -= s == INVALID_SOCKET ? 0 : 1;
+#endif
+    shutdown(s, BOTH_DIRECTION);
+    closesocket(s);
+  }
 
   int report_socket_error() {
 #if defined(_WIN32) && !defined(__INTIME__)
@@ -16,30 +28,43 @@ namespace socketpp {
   }
     
   SOCKET CreateSocket(int const port, int const type) {
-      static int yes = 1;
-      struct addrinfo hint;
-      struct addrinfo* hi_p;
-      memset(reinterpret_cast<char*>(&hint), 0, sizeof(hint));
-      hint.ai_family = AF_INET;
-      hint.ai_socktype = type;
-      hint.ai_flags = AI_PASSIVE;
-      getaddrinfo(nullptr, std::to_string(port).c_str(), &hint, &hi_p);
-      std::unique_ptr <struct addrinfo, decltype(&freeaddrinfo)>  host_info(hi_p, &freeaddrinfo);
-      SOCKET s = socket(host_info.get()->ai_family, host_info.get()->ai_socktype, host_info.get()->ai_protocol);
-      CHECK_SOCKET(s);
-      CHECK_STATUS(setsockopt(s, SOL_SOCKET, SO_REUSEADDR, reinterpret_cast<char*>(&yes), sizeof(yes)));
-      CHECK_STATUS(bind(s, host_info.get()->ai_addr, host_info.get()->ai_addrlen));
-      CHECK_STATUS(listen(s, 1));
-      return s;
+    static int yes = 1;
+    struct addrinfo hint;
+    struct addrinfo* hi_p;
+    memset(reinterpret_cast<char*>(&hint), 0, sizeof(hint));
+    hint.ai_family = AF_INET;
+    hint.ai_socktype = type;
+    hint.ai_flags = AI_PASSIVE;
+    getaddrinfo(nullptr, std::to_string(port).c_str(), &hint, &hi_p);
+    std::unique_ptr <struct addrinfo, decltype(&freeaddrinfo)>  host_info(hi_p, &freeaddrinfo);
+    SOCKET s = socket(host_info.get()->ai_family, host_info.get()->ai_socktype, host_info.get()->ai_protocol);
+    CHECK_SOCKET(s);
+    CHECK_STATUS(setsockopt(s, SOL_SOCKET, SO_REUSEADDR, reinterpret_cast<char*>(&yes), sizeof(yes)));
+    CHECK_STATUS(bind(s, host_info.get()->ai_addr, host_info.get()->ai_addrlen));
+    CHECK_STATUS(listen(s, 1));
+    return s;
   error:
-      report_socket_error();
-      throw SocketException();
+    report_socket_error();
+    throw SocketException();
   }
 
-  Socket::Socket(SOCKET const& socket) : socket_(socket)
-  { }
+  Socket::Socket(SOCKET const& socket) 
+    : socket_(socket),
+      socket_mutex_()
+  {
+#ifdef DEBUG_MEMORY_ALLOC
+    g_nb_opened_sockets++;
+#endif
+  }
 
-    Socket::Socket(int const port, int const type) : socket_(CreateSocket(port, type)){ }
+  Socket::Socket(int const port, int const type) 
+    : socket_(CreateSocket(port, type)),
+      socket_mutex_()
+  {
+#ifdef DEBUG_MEMORY_ALLOC
+    g_nb_opened_sockets++;
+#endif
+  }
 
   void Socket::write(std::string&& msg) {
     std::lock_guard<std::mutex> lock(socket_mutex_);
@@ -62,7 +87,7 @@ namespace socketpp {
     struct sockaddr_storage client_addr;
     socklen_t addr_size = sizeof(client_addr);
     SOCKET client = INVALID_SOCKET;
-//    std::lock_guard<std::mutex> lock(socket_mutex_);
+    std::lock_guard<std::mutex> lock(socket_mutex_);
     if((client = ::accept(socket_.get(), reinterpret_cast<struct sockaddr*>(&client_addr), &addr_size)) == INVALID_SOCKET)
       throw SocketException();
     return client;

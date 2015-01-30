@@ -5,7 +5,7 @@
 #  include <WinSock2.h>
 #  include <ws2tcpip.h>
 #  include <io.h>
-   static const int BOTH_DIRECTION=SD_BOTH;
+static const int BOTH_DIRECTION=SD_BOTH;
 #  define CHECK_STATUS(st) if ((st) != 0) goto error;
 # endif
 #  pragma warning(disable:4290)
@@ -24,44 +24,38 @@
 #endif
 #define CHECK_SOCKET(so) if ((so) == INVALID_SOCKET) goto error;
 
-#include <socketpp/exception.hpp>
 #include <socketpp/unique_handler.hpp>
 
 #include <string>
 #include <mutex>
 #include <memory>
+#include <iostream>
 
-
-struct SocketDeleter
-{
-  typedef UniqueHandle<SOCKET, INVALID_SOCKET> pointer;
-  void operator()(pointer p) {
-    closesocket(p);
-    shutdown(p, BOTH_DIRECTION);
-    p = INVALID_SOCKET;
-  }
-};
-
-typedef std::unique_ptr<SOCKET, SocketDeleter> unique_SOCKET;
 
 namespace socketpp {
 
+  void del_SOCKET(SOCKET s);
+
+  typedef std::unique_ptr<SOCKET, stateless_deleter<SOCKET, void(*)(SOCKET), &del_SOCKET>> unique_SOCKET;
+
   class Socket {
     public:
-      explicit Socket(SOCKET const & socket = INVALID_SOCKET);
+      Socket(SOCKET const & socket);
       Socket(int const port, int const type);
-      Socket(Socket const& ) = delete;
+      Socket(Socket const&) = delete;
       Socket& operator=(Socket const &) = delete;
       virtual ~Socket() = default;
 
       void write(std::string&&);
       std::string read();
 
+      void close() { socket_.reset(INVALID_SOCKET); }
+
       SOCKET accept();
 
     protected:
-      std::mutex socket_mutex_;
       unique_SOCKET socket_;
+      std::mutex socket_mutex_;
   };
 }
 

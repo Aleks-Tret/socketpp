@@ -6,6 +6,8 @@ endif()
 
 project(SocketppTest)
 
+add_definitions(-DDEBUG_MEMORY_ALLOC)
+
 #------------------------------------------------------------------------------
 # Required CPM Setup - See: http://github.com/iauns/cpm
 #------------------------------------------------------------------------------
