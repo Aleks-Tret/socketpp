@@ -17,10 +17,6 @@
 
 #include <socketpp/server.hpp>
 
-#ifdef DEBUG_MEMORY_ALLOC
-extern long g_nb_opened_sockets;
-#endif
-
 std::string remove_eol(std::string && s) {
     return std::string(s.begin(), std::remove(s.begin(), s.end(), '\n'));
 }
@@ -61,7 +57,7 @@ unsigned int send_requests_and_check_result(std::string msg, size_t nb_messages,
       std::string command = "python " + get_exe_path() + R"(\..\..\nc.py )" + address + " " + std::to_string(port) + R"( --timeout 1 --message ")" + message + R"(")";
 #else
       std::string command = R"(echo ")" + message + R"(" | nc )" + address + " " + std::to_string(port);
-     // std::string command = R"(python3 ~/Desktop/socketpp/tests/nc.py )" + address + " " + std::to_string(port) + R"( --timeout 1 --message ")" + message + R"(")";
+//      std::string command = R"(/usr/local/bin/python3 ~/Desktop/socketpp/tests/nc.py )" + address + " " + std::to_string(port) + R"( --timeout 1 --message ")" + message + R"(")";
 #endif
       return exec(command);
     }, get_msg(msg)(v), address, port)));
@@ -82,36 +78,26 @@ TEST_CASE("TCP Connections", "[server]") {
 #endif
   static std::string const address = "localhost";
   static unsigned int const port = 8888;
-  static size_t const pool_size = 5;
     
   std::srand(static_cast<unsigned int>(std::time(nullptr)));
 
-  socketpp::Server* server = new socketpp::Server(8888, SOCK_STREAM, [](std::string req) {
+  socketpp::Server* server = new socketpp::Server(port, SOCK_STREAM, [](std::string req) {
       std::this_thread::sleep_for(std::chrono::milliseconds(50));
       return req;
-    }, pool_size);
+    });
   server->start();
 
   SECTION("Handle one connection") {
-    REQUIRE(send_requests_and_check_result("coucou", 1, address, port) == 1);
-  }
-
-  SECTION("Handle multiple connections") {
-    size_t nb_messages = pool_size;
-    REQUIRE(send_requests_and_check_result("coucou", nb_messages , address, port) == nb_messages);
+    CHECK(send_requests_and_check_result("coucou", 1, address, port) == 1);
   }
 
   SECTION("Handle too numerous connections") {
-    size_t nb_messages = pool_size*pool_size;
+    size_t nb_messages = 20;
     auto nb_valid_result = send_requests_and_check_result("coucou", nb_messages, address, port);
-    REQUIRE(nb_valid_result >= pool_size);
+    CHECK(nb_valid_result > 15);
   }
-  std::this_thread::sleep_for(std::chrono::milliseconds(100));
   delete server;
-#ifdef DEBUG_MEMORY_ALLOC
-  // Check that all created SOCKET have been closed
-  REQUIRE(g_nb_opened_sockets == 0);
-#endif
+    
 #if defined(_WIN32) && !defined(__INTIME__)
   WSACleanup();
 #endif

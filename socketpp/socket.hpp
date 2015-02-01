@@ -34,10 +34,12 @@ static const int BOTH_DIRECTION=SD_BOTH;
 
 namespace socketpp {
 
-  void del_SOCKET(SOCKET s);
-
+  inline void del_SOCKET(SOCKET s) {
+    shutdown(s, BOTH_DIRECTION);
+    closesocket(s);
+  }
   using unique_SOCKET = std::unique_ptr<SOCKET, OneLinerDeleter<SOCKET, INVALID_SOCKET, void, del_SOCKET> >;
-
+    
   class Socket {
     public:
       Socket(SOCKET const & socket);
@@ -48,9 +50,7 @@ namespace socketpp {
 
       void write(std::string&&);
       std::string read();
-
-      void close() { socket_.reset(INVALID_SOCKET); }
-
+      void close();
       SOCKET accept();
 
     protected:

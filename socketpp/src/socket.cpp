@@ -3,19 +3,7 @@
 
 #include <cstring>
 
-#ifdef DEBUG_MEMORY_ALLOC
-long g_nb_opened_sockets = 0;
-#endif
-
 namespace socketpp {
-  
-  inline void del_SOCKET(SOCKET s) {
-#ifdef DEBUG_MEMORY_ALLOC
-    g_nb_opened_sockets -= s == INVALID_SOCKET ? 0 : 1;
-#endif
-    shutdown(s, BOTH_DIRECTION);
-    closesocket(s);
-  }
 
   int report_socket_error() {
 #if defined(_WIN32) && !defined(__INTIME__)
@@ -50,19 +38,11 @@ namespace socketpp {
 
   Socket::Socket(SOCKET const& socket) 
     : socket_(socket)
-  {
-#ifdef DEBUG_MEMORY_ALLOC
-    g_nb_opened_sockets++;
-#endif
-  }
+  { }
 
   Socket::Socket(int const port, int const type) 
     : socket_(CreateSocket(port, type))
-  {
-#ifdef DEBUG_MEMORY_ALLOC
-    g_nb_opened_sockets++;
-#endif
-  }
+  { }
 
   void Socket::write(std::string&& msg) {
     std::lock_guard<std::mutex> lock(socket_mutex_);
@@ -85,10 +65,18 @@ namespace socketpp {
     struct sockaddr_storage client_addr;
     socklen_t addr_size = sizeof(client_addr);
     SOCKET client = INVALID_SOCKET;
-    std::lock_guard<std::mutex> lock(socket_mutex_);
-    if((client = ::accept(socket_.get(), reinterpret_cast<struct sockaddr*>(&client_addr), &addr_size)) == INVALID_SOCKET)
+    std::function<SOCKET()> server_socket = [this]() {
+//      std::lock_guard<std::mutex> lock(socket_mutex_);
+      return socket_.get();
+    };
+    if((client = ::accept(server_socket(), reinterpret_cast<struct sockaddr*>(&client_addr), &addr_size)) == INVALID_SOCKET)
       throw SocketException();
     return client;
+  }
+
+  void Socket::close() {
+    std::lock_guard<std::mutex> lock(socket_mutex_);
+    socket_.reset(INVALID_SOCKET);
   }
 }
 
