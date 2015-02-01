@@ -1,6 +1,6 @@
-# socketcpp11
+# socketpp
 
-[![Build Status](https://travis-ci.org/bcachet/socketcpp11.png)](https://travis-ci.org/bcachet/socketcpp11)
+[![Build Status](https://travis-ci.org/bcachet/socketpp.png)](https://travis-ci.org/bcachet/socketpp)
 
 ## Build environment
 
@@ -20,8 +20,7 @@ All other tools will be installed inside *thirdparty* directory as soon as you l
 
 ```bash
 apt-get install cmake
-apt-get install python-sphinx
-make prepare
+./tests/run-tests.sh
 ```
 #### Mac OS X
 
@@ -29,6 +28,5 @@ You can easily install needed libraries with [Homebrew](http://mxcl.github.com/h
 
 ```bash
 brew install cmake
-brew install pip && pip install sphinx
-make prepare
+./tests/run-tests.sh
 ```

@@ -1,17 +1,40 @@
 language: cpp
+
 compiler:
   - gcc
   - clang
+
+before_install:
+  # install gcc-4.8 with c++11 support: https://github.com/travis-ci-tester/travis-test-gcc-cxx-11
+  - sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
+  - sudo apt-get update
+  - sudo apt-get install g++-4.8
+  - sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-4.8 90
+  - sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-4.8 90
+  # https://github.com/travis-ci-tester/travis-test-clang-cxx-11
+  - sudo apt-get install libstdc++-4.8-dev
+  - sudo apt-get install valgrind
+ 
 branches:
   only:
     - master
     - develop
+
+before_script:
+  - cd tests
+  - mkdir -p bin
+  - cd bin
+  - cmake -Wno-dev ..
+  - cd ..
+
+script: 
+  - cmake --build bin --target tests
+  - valgrind --error-exitcode=1 --leak-check=full bin/tests
+
 notifications:
   recipients:
     - bertrand.cachet@gmail.com
   email:
     on_success: change
-    on_failure: always
-script: 
-  - .tests/run-tests.sh
+    on_failure: change
 
