@@ -7,7 +7,6 @@
 #include <numeric>
 #include <list>
 #include <iostream>
-#include <random>
 
 #ifdef _WIN32
 # define popen _popen
@@ -21,17 +20,20 @@ std::string remove_eol(std::string && s) {
     return std::string(s.begin(), std::remove(s.begin(), s.end(), '\n'));
 }
 
+void FILE_deleter(FILE* f) {
+  pclose(f);
+}
+
 std::string exec(std::string cmd) {
-  FILE* pipe = popen(cmd.c_str(), "r");
+  std::unique_ptr<FILE, decltype(&FILE_deleter)> pipe(popen(cmd.c_str(), "r"), &FILE_deleter);
   if (!pipe) return "ERROR";
   char buffer[128];
   std::string result = "";
-  while(!feof(pipe)) {
-    if(fgets(buffer, 128, pipe) != nullptr)
+  while(!feof(pipe.get())) {
+    if(fgets(buffer, 128, pipe.get()) != nullptr)
       result += buffer;
   }
-  pclose(pipe);
-    return remove_eol(std::move(result));
+  return remove_eol(std::move(result));
 }
 
 std::function<std::string(unsigned int)> get_msg(std::string msg) {
@@ -78,8 +80,6 @@ TEST_CASE("TCP Connections", "[server]") {
 #endif
   static std::string const address = "localhost";
   static unsigned int const port = 8888;
-    
-  std::srand(static_cast<unsigned int>(std::time(nullptr)));
 
   socketpp::Server* server = new socketpp::Server(port, SOCK_STREAM, [](std::string req) {
       std::this_thread::sleep_for(std::chrono::milliseconds(50));
