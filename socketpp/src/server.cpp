@@ -6,7 +6,7 @@
 namespace socketpp
 {
   Server::Server(int const port, int const type, request_handler_t handler) throw (SocketException)
-      : socket_(port, type),
+      : Socket(port, type),
         server_thread_(),
         request_handler_(handler)
   { }
@@ -24,21 +24,25 @@ namespace socketpp
       }
     }
     catch (...) { }
-    socket.close();
+  };
+
+  struct thread_deleter {
+    void operator()(std::thread* t) {
+      if (t->joinable())
+        t->join();
+      delete t;
+    }
   };
 
   void Server::handle_connections() {
     SOCKET client_sock;
-    std::list<std::thread> connections;
+    using thread_ptr = std::unique_ptr<std::thread, thread_deleter>;
+    std::list<thread_ptr> connections;
     try {
-      while ((client_sock = socket_.accept()) != INVALID_SOCKET) {
-        connections.push_back(std::thread(client_connection, client_sock, request_handler_));
+      while ((client_sock = accept()) != INVALID_SOCKET) {
+        connections.push_back(thread_ptr(new std::thread(client_connection, client_sock, request_handler_)));
       }
     }
-    catch (...) { }
-    std::for_each(connections.begin(), connections.end(), [](std::thread & connection) {
-      connection.join();
-    });
-    connections.clear();
+    catch (...) {}
   }
 }

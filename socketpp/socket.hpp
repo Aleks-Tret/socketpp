@@ -38,7 +38,15 @@ namespace socketpp {
     shutdown(s, BOTH_DIRECTION);
     closesocket(s);
   }
-  using unique_SOCKET = std::unique_ptr<SOCKET, OneLinerDeleter<SOCKET, INVALID_SOCKET, void, del_SOCKET> >;
+
+  class unique_SOCKET : public std::unique_ptr<SOCKET, OneLinerDeleter<SOCKET, INVALID_SOCKET, void, del_SOCKET>> {
+  public:
+    operator SOCKET() const {
+      return get();
+    }
+    explicit unique_SOCKET(const SOCKET& s) : std::unique_ptr<SOCKET, OneLinerDeleter<SOCKET, INVALID_SOCKET, void, del_SOCKET>>(s) {}
+  };
+
     
   class Socket {
     public:
@@ -50,12 +58,10 @@ namespace socketpp {
 
       void write(std::string&&);
       std::string read();
-      void close();
       SOCKET accept();
 
     protected:
       unique_SOCKET socket_;
-      std::mutex socket_mutex_;
   };
 }
 
