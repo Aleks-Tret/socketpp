@@ -1,8 +1,5 @@
 #include <catch.hpp>
 
-#include <string>
-#include <stdio.h>
-#include <chrono>
 #include <future>
 #include <numeric>
 #include <list>
@@ -97,17 +94,23 @@ TEST_CASE("TCP Connections", "[server]") {
     CHECK(send_requests_and_check_result("coucou", 1, address, port) == 1);
   }
 
-  SECTION("Handle too numerous connections") {
+  SECTION("Handle numerous connections") {
     size_t nb_messages = 20;
     auto nb_valid_result = send_requests_and_check_result("coucou", nb_messages, address, port);
     CHECK(nb_valid_result > 15);
   }
   delete server;
-    
+
 #if defined(_WIN32) && !defined(__INTIME__)
   WSACleanup();
 #endif
 }
+
+//TEST_CASE("Address resolver", "[socket]") {
+//  SECTION("Localhost address") {
+//    socketpp::Socket s(std::make_shared<socketpp::Address>("localhost", 8888));
+//  }
+//}
 
 #ifdef _WIN32
 #undef popen

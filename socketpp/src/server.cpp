@@ -6,7 +6,7 @@
 namespace socketpp
 {
   Server::Server(int const port, int const type, request_handler_t handler) throw (SocketException)
-      : Socket(port, type),
+      : Socket(std::make_shared<Address>("localhost", port, type)),
         server_thread_(),
         request_handler_(handler)
   { }
@@ -19,8 +19,8 @@ namespace socketpp
     std::string req;
     Socket socket(client_socket);
     try {
-      while ((req = socket.read()).length() > 0) {
-        socket.write(handler(req));
+      while ((req = socket.Read()).length() > 0) {
+        socket.Write(handler(req));
       }
     }
     catch (...) { }
@@ -39,7 +39,7 @@ namespace socketpp
     using thread_ptr = std::unique_ptr<std::thread, thread_deleter>;
     std::list<thread_ptr> connections;
     try {
-      while ((client_sock = accept()) != INVALID_SOCKET) {
+      while ((client_sock = Accept()) != INVALID_SOCKET) {
         connections.push_back(thread_ptr(new std::thread(client_connection, client_sock, request_handler_)));
       }
     }
