@@ -12,14 +12,18 @@ prepare() {
   popd
 }
 
-build() {
+cmake_target() {
   pushd ./bin > /dev/null
-    cmake --build . --target tests
+    cmake --build . --target $1
   popd
 }
 
+build() {
+    cmake_target tests
+}
+
 run() {
-  ./bin/tests
+    cmake_target run_tests
 }
 
 if [ ! -d ./bin ]; then

@@ -72,10 +72,11 @@ if (UNIX)
   endif()
 endif()
 
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_SOURCE_DIR}/bin)
-
 add_executable(tests ${Sources})
 target_link_libraries(tests
   ${CPM_LIBRARIES}
   ${PTHREADS})
 
+add_custom_target(run_tests
+                    COMMAND $<TARGET_FILE:tests>
+                    DEPENDS tests)

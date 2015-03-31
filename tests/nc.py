@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+from __future__ import print_function
 import click
 import socket
 import sys
@@ -30,4 +31,4 @@ def client(address, port, udp, message, timeout):
 
 if __name__ == '__main__':
   client()
-  
+

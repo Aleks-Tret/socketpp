@@ -6,13 +6,13 @@
 namespace socketpp
 {
   Server::Server(int const port, int const type, request_handler_t handler) throw (SocketException)
-      : Socket(std::make_shared<Address>("localhost", port, type)),
+      : Socket(mem::make_shared<Address>("localhost", port, type)),
         server_thread_(),
         request_handler_(handler)
   { }
 
   void Server::start() {
-    server_thread_ = std::thread(&Server::handle_connections, this);
+    server_thread_ = func::thread(&Server::handle_connections, this);
   }
 
   auto client_connection = [](SOCKET client_socket, request_handler_t handler) {
@@ -27,7 +27,7 @@ namespace socketpp
   };
 
   struct thread_deleter {
-    void operator()(std::thread* t) {
+    void operator()(async::thread* t) {
       if (t->joinable())
         t->join();
       delete t;
@@ -36,11 +36,11 @@ namespace socketpp
 
   void Server::handle_connections() {
     SOCKET client_sock;
-    using thread_ptr = std::unique_ptr<std::thread, thread_deleter>;
+    using thread_ptr = mem::unique_ptr<std::thread, thread_deleter>;
     std::list<thread_ptr> connections;
     try {
       while ((client_sock = Accept()) != INVALID_SOCKET) {
-        connections.push_back(thread_ptr(new std::thread(client_connection, client_sock, request_handler_)));
+        connections.push_back(thread_ptr(new async::thread(client_connection, client_sock, request_handler_)));
       }
     }
     catch (...) {}

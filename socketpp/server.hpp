@@ -3,11 +3,25 @@
 #include <socketpp/socket.hpp>
 #include <socketpp/exception.hpp>
 
-#include <thread>
+
+
+#ifdef __INTIME__
+# include <boost/function.hpp>
+  namespace func = boost;
+
+#include <boost/thread.hpp>
+  namespace async = boost;
+#else
+# include <functional>
+  namespace func = std;
+
+# include <thread>
+  namespace async = std;
+#endif
 
 
 namespace socketpp {
-  typedef std::function<std::string(std::string)> request_handler_t;
+  typedef func::function<std::string(std::string)> request_handler_t;
 
   class Server : public Socket {
     public:
@@ -21,7 +35,7 @@ namespace socketpp {
       void start();
 
     private:
-      std::thread server_thread_;
+      async::thread server_thread_;
       request_handler_t request_handler_;
 
       void handle_connections();
